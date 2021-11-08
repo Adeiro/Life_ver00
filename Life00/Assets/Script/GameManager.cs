@@ -10,21 +10,47 @@ public class GameManager : MonoBehaviour
     [SerializeField] private float delaytime = 0;
     [SerializeField] private bool work = false;
 
-    private List<Vector2Int> newadd;  // Те, кто будут добавлены
-    private List<ScrKillSquare> newdel;  // Те, кто будут удалены
+    private Dictionary<Vector2Int, GameObject> sqlist;  // Список всех имеющихся квадратиков
+
+
+    // Работа со списком клеток
+
+    // Возвращает true если клетка с такими координатами пуста
+    private bool checkFree(Vector2Int cp)
+    {
+        return !(sqlist.ContainsKey(cp));
+    }
+
+    private GameObject findCell(Vector2Int cp)
+    {
+        if (sqlist.ContainsKey(cp)) return sqlist[cp];
+        return null;
+    }
 
 // Создаем клетку по определенным координатам (в дальнейшем - с проверкой целостности и добавлением в списки)
     public void addCell(Vector2Int CreatePos)
     {  
-        GameObject newgo = Instantiate(pfsquare);
-        ScrKillSquare kkk = newgo.GetComponent<ScrKillSquare>();
-        kkk.BornMe(transform,CreatePos);
+        if (checkFree(CreatePos))
+        {
+            GameObject newgo = Instantiate(pfsquare);
+            ScrKillSquare kkk = newgo.GetComponent<ScrKillSquare>();
+            kkk.BornMe(transform, CreatePos);
+            kkk.FillNext(findCell(new Vector2Int(CreatePos.x - 1, CreatePos.y + 1)),
+                         findCell(new Vector2Int(CreatePos.x, CreatePos.y + 1)),
+                         findCell(new Vector2Int(CreatePos.x + 1, CreatePos.y + 1)),
+                         findCell(new Vector2Int(CreatePos.x - 1, CreatePos.y)),
+                         findCell(new Vector2Int(CreatePos.x + 1, CreatePos.y)),
+                         findCell(new Vector2Int(CreatePos.x - 1, CreatePos.y - 1)),
+                         findCell(new Vector2Int(CreatePos.x, CreatePos.y - 1)),
+                         findCell(new Vector2Int(CreatePos.x + 1, CreatePos.y - 1)));
+            sqlist.Add(CreatePos,newgo);
+        }
     }
 
-// Удаляем определенную клетку с доски (с поддержкой целостности)
-    public void delCell(GameObject cell)
+// Удаляем определенную клетку с доски (только из списка. Должно вызываться только при удалении клетки)
+    public void delCell(Vector2Int key)
     {
-        cell.GetComponent<ScrKillSquare>().KillMe();
+        sqlist.Remove(key);
     }
 
     // Реакция на действия пользователя
@@ -33,14 +59,19 @@ public class GameManager : MonoBehaviour
         
         Vector3 newpos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
         Vector2Int crpos = new Vector2Int(Mathf.RoundToInt(newpos.x), Mathf.RoundToInt(newpos.y));
-        addCell(crpos);
+        if (checkFree(crpos))
+        {
+            addCell(crpos);
+        } else
+        {
+            findCell(crpos).GetComponent<ScrKillSquare>().KillMe();
+        }
     }
 
 
     void Start()
     {
-        newadd = new List<Vector2Int>();
-        newdel = new List<ScrKillSquare>();
+        sqlist=new Dictionary<Vector2Int, GameObject>();  // Список всех имеющихся квадратиков
         if (pfsquare == null) pfsquare = null;
         if (delaytime == 0) delaytime = 10;
         work = false;
@@ -49,14 +80,30 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator OneStep()
     {
+    // Внутренние рабочие данные
+        List<Vector2Int> newadd= new List<Vector2Int>();        // Те, кто будут добавлены
+        List<Vector2Int> newnotadd = new List<Vector2Int>();    // Те, кто просмотрен, но добавлен не будет
+        List<ScrKillSquare> newdel= new List<ScrKillSquare>();  // Те, кто будут удалены
+
         while (true)
         {
             yield return new WaitForSeconds(delaytime);
+
+            Debug.Log("Прошел очередной период. У нас " + sqlist.Count+" клеток");
+// Выводим клетки и их связи
+            foreach (KeyValuePair<Vector2Int,GameObject> d in sqlist)
+            {
+                ScrKillSquare sck = d.Value.GetComponent<ScrKillSquare>();
+                Debug.Log(sck.GetDebugInfo());
+            }
+
+
             if (work)
             {
                 // Выполняем работу для каждого квадратика среди имеющихся
                 GameObject[] squares = GameObject.FindGameObjectsWithTag("Live");
                 newadd.Clear();
+                newnotadd.Clear();
                 newdel.Clear();
                 foreach (GameObject square in squares)
                 {
@@ -67,9 +114,28 @@ public class GameManager : MonoBehaviour
                     {
                         newdel.Add(mysq);
                     }
-                    foreach (Vector2Int chk in checksq)
+                    foreach (Vector2Int curpos in checksq)
                     {
-                        if (!newadd.Contains(chk)) newadd.Add(chk);
+                        if ((!newadd.Contains(curpos))&&(!newnotadd.Contains(curpos)))
+                        {
+                            int nnum = 0;
+                            if (findCell(new Vector2Int(curpos.x - 1, curpos.y + 1)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x, curpos.y + 1)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x + 1, curpos.y + 1)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x - 1, curpos.y)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x + 1, curpos.y)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x - 1, curpos.y - 1)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x, curpos.y - 1)) != null) nnum++;
+                            if (findCell(new Vector2Int(curpos.x + 1, curpos.y - 1)) != null) nnum++;
+                            if (nnum == 3)
+                            {
+                                newadd.Add(curpos);
+                            }
+                            else if (nnum > 3)
+                            {
+                                newnotadd.Add(curpos);
+                            }
+                        }
                     }
                 }
                 // Добавляем новеньких (если им повезло)
@@ -89,7 +155,13 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-
+        if (Input.GetMouseButtonDown(1))
+        {
+            Vector3 newpos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
+            Vector2Int crpos = new Vector2Int(Mathf.RoundToInt(newpos.x), Mathf.RoundToInt(newpos.y));
+            if (findCell(crpos)) Debug.Log("isCells on X:"+ newpos.x+ " Y:"+ newpos.y); 
+              else Debug.Log("Clear X:" + newpos.x + " Y:" + newpos.y);
+        }
     }
 
 
