@@ -43,6 +43,7 @@ public class GameManager : MonoBehaviour
                          findCell(new Vector2Int(CreatePos.x - 1, CreatePos.y - 1)),
                          findCell(new Vector2Int(CreatePos.x, CreatePos.y - 1)),
                          findCell(new Vector2Int(CreatePos.x + 1, CreatePos.y - 1)));
+            //kkk.FillNext();
             sqlist.Add(CreatePos,newgo);
         }
     }
@@ -155,13 +156,7 @@ public class GameManager : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        if (Input.GetMouseButtonDown(1))
-        {
-            Vector3 newpos = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            Vector2Int crpos = new Vector2Int(Mathf.RoundToInt(newpos.x), Mathf.RoundToInt(newpos.y));
-            if (findCell(crpos)) Debug.Log("isCells on X:"+ newpos.x+ " Y:"+ newpos.y); 
-              else Debug.Log("Clear X:" + newpos.x + " Y:" + newpos.y);
-        }
+
     }
 
 
